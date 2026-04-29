@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта рассадки в офисе</title>
+    <style>
+        /* === Переменные тем === */
+        :root {
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --border-color: #d2d2d7;
+            
+            --seat-fade-bg: #e5e5ea;
+            --seat-fade-text: #8e8e93;
+            --seat-highlight-bg: #ffcc00;
+            --seat-highlight-text: #000000;
+            
+            --control-bg: #ffffff;
+            --shadow: 0 4px 6px rgba(0,0,0,0.05);
+            --badge-bg: #e5e5ea;
+            
+            --accent-color: #007aff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #000000;
+            --surface-color: #1c1c1e;
+            --text-primary: #f5f5f7;
+            --text-secondary: #a1a1a6;
+            --border-color: #38383a;
+            
+            --seat-fade-bg: #2c2c2e;
+            --seat-fade-text: #636366;
+            --seat-highlight-bg: #ffd60a;
+            --seat-highlight-text: #000000;
+            
+            --control-bg: #2c2c2e;
+            --shadow: 0 4px 6px rgba(0,0,0,0.3);
+            --badge-bg: #3a3a3c;
+            
+            --accent-color: #0a84ff;
+        }
+
+        /* === Базовые стили === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* === Панель управления === */
+        .header {
+            background-color: var(--surface-color);
+            padding: 16px 20px;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .cycle-info {
+            display: inline-block;
+            background-color: var(--badge-bg);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Увеличенная кнопка смены темы */
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 32px; /* Увеличен размер (был 24px) */
+            cursor: pointer;
+            padding: 8px; /* Увеличен отступ */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end; /* Выравнивание элементов по нижнему краю */
+        }
+
+        select, input[type="date"] {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--control-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            height: 40px;
+        }
+        
+        select {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        input[type="date"] {
+            flex: 1;
+        }
+
+        /* === Блок выбора даты с кнопкой "Сегодня" === */
+        .date-picker-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .today-btn {
+            align-self: flex-end; /* Выравниваем по правому краю над датой */
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0 4px;
+            transition: opacity 0.2s;
+        }
+
+        .today-btn:hover {
+            opacity: 0.7;
+            text-decoration: underline;
+        }
+
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .icon-btn {
+            background-color: var(--control-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .icon-btn:hover {
+            background-color: var(--seat-fade-bg);
+        }
+
+        /* === Карта рассадки === */
+        .map-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+        .office-layout {
+            position: relative;
+            background-color: var(--surface-color);
+            padding: 24px 60px 24px 30px; 
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            min-width: 480px;
+        }
+
+        .landmark {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .landmark.top {
+            margin-bottom: 4px;
+        }
+
+        .landmark.right { 
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            writing-mode: vertical-rl; 
+        }
+
+        .grid-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .row-label {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            width: 20px;
+            text-align: right;
+        }
+
+        .seats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .seat {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 4px;
+            word-break: break-word;
+            transition: all 0.2s ease;
+            cursor: default;
+            
+            /* Состояние по умолчанию */
+            background-color: var(--seat-fade-bg);
+            color: var(--seat-fade-text);
+            border: 2px solid transparent;
+        }
+
+        /* Подсветка */
+        .seat.highlight {
+            background-color: var(--seat-highlight-bg) !important;
+            color: var(--seat-highlight-text) !important;
+            font-weight: 600;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
+            z-index: 2;
+        }
+
+        @media (max-width: 600px) {
+            .header-top { flex-direction: column; gap: 10px; }
+            .theme-toggle { position: absolute; top: 16px; right: 20px; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .date-picker-wrapper { align-items: stretch; }
+            .today-btn { align-self: flex-end; }
+            .map-container { justify-content: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-top">
+            <div class="title-group">
+                <h1>Карта рассадки</h1>
+                <div class="cycle-info" id="cycle-info">Загрузка...</div>
+            </div>
+            <button class="theme-toggle" id="theme-btn" aria-label="Переключить тему">🌓</button>
+        </div>
+        <div class="controls">
+            <select id="entity-select">
+                <option value="" disabled selected>Выберите команду/сотрудника...</option>
+                <option value="Online">Управление Online</option>
+                <option value="Offline">Управление Offline</option>
+                <option value="IP">Управление IP</option>
+                <option value="IT">Управление IT</option>
+                <option value="Стажеры">Стажеры</option>
+                <option value="Игорь">Игорь</option>
+                <option value="Элина">Элина</option>
+            </select>
+            
+            <!-- Обертка для даты и кнопки "Сегодня" -->
+            <div class="date-picker-wrapper">
+                <button class="today-btn" id="today-btn">Сегодня</button>
+                <div class="date-controls">
+                    <button class="icon-btn" id="prev-day" aria-label="Предыдущий день">◀</button>
+                    <input type="date" id="date-picker">
+                    <button class="icon-btn" id="next-day" aria-label="Следующий день">▶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-container">
+        <div class="office-layout">
+            <div class="landmark top">Шкафы</div>
+            
+            <div class="grid-wrapper" id="map-grid">
+                <!-- Сетка генерируется через JS -->
+            </div>
+
+            <div class="landmark right">Окно</div>
+        </div>
+    </div>
+
+    <script>
+        // === 1. Маппинг команд ===
+        const teamMapping = {
+            "Аня Б.": "Online", "Команда Ани Б.": "Online", "Андрей": "Online",
+            "Команда Андрея": "Online", "Диана": "Online", "Команда Дианы": "Online",
+            "Дима": "Online", "Команда Димы": "Online", "Енике": "Online",
+            
+            "Даня": "Offline", "Команда Дани": "Offline", "Илона": "Offline",
+            "Ира": "Offline", "Команда Иры": "Offline", "Лена": "Offline", "Команда Лены": "Offline",
+            
+            "Артемий": "IP", "Маша": "IP", "Команда Маши": "IP", "Оля М.": "IP",
+            
+            "Даша": "IT", "Команда Даши": "IT",
+            
+            "Стажер": "Стажеры", "Игорь": "Игорь", "Элина": "Элина",
+            
+            "Аня Г.": "TBD", "Команда Ани Г.": "TBD", "Лида": "TBD"
+        };
+
+        const START_DATE = new Date(2026, 4, 4);
+
+        // === 2. Данные рассадки ===
+        const emptyDay = [
+            ["Пусто", "Пусто", "Пусто", "Пусто"],
+            ["Пусто", "Пусто", "Пусто", "Пусто"],
+            ["Пусто", "Пусто", "Пусто", "Пусто"],
+            ["Пусто", "Пусто", "Пусто", "Пусто"]
+        ];
+
+        const scheduleData = {
+            1: {
+                1: [
+                    ["Команда Дианы", "Команда Дианы", "Игорь", "Элина"],
+                    ["Команда Дианы", "Команда Дианы", "Команда Дианы", "Диана"],
+                    ["Команда Ани Г.", "Команда Ани Г.", "Команда Ани Г.", "Аня Г."],
+                    ["Стажер", "Стажер", "Андрей", "Дима"]
+                ],
+                2: [
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Аня Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Лены"],
+                    ["Стажер", "Стажер", "Команда Ани Б.", "Команда Ани Б."]
+                ],
+                3: [
+                    ["Команда Маши", "Команда Маши", "Игорь", "Элина"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Маша"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Лена"],
+                    ["Аня Б.", "Команда Даши", "Команда Даши", "Даша"]
+                ],
+                4: [
+                    ["Стажер", "Стажер", "Игорь", "Элина"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Маша"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Лена"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Команда Лены"]
+                ],
+                5: [
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Даша"],
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Оля М.", "Артемий", "Команда Даши"],
+                    ["Стажер", "Команда Ани Б.", "Илона", "Ира"]
+                ]
+            },
+            2: {
+                1: [
+                    ["Даня", "Команда Дани", "Игорь", "Элина"],
+                    ["Команда Димы", "Команда Димы", "Команда Димы", "Дима"],
+                    ["Ира", "Команда Иры", "Команда Иры", "Команда Иры"],
+                    ["Стажер", "Стажер", "Команда Ани Б.", "Диана"]
+                ],
+                2: [
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Аня Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б."]
+                ],
+                3: [
+                    ["Команда Маши", "Команда Маши", "Игорь", "Элина"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Маша"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Лена"],
+                    ["Аня Б.", "Команда Даши", "Команда Даши", "Даша"]
+                ],
+                4: [
+                    ["Стажер", "Стажер", "Игорь", "Элина"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Маша"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Лена"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Команда Лены"]
+                ],
+                5: [
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Даша"],
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Оля М.", "Артемий", "Команда Даши"],
+                    ["Стажер", "Команда Маши", "Команда Маши", "Команда Маши"]
+                ]
+            },
+            3: {
+                1: [
+                    ["Команда Маши", "Команда Маши", "Игорь", "Элина"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Маша"],
+                    ["Стажер", "Команда Маши", "Команда Маши", "Команда Маши"],
+                    ["Стажер", "Команда Даши", "Команда Даши", "Команда Даши"]
+                ],
+                2: [
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Аня Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Лены"],
+                    ["Стажер", "Стажер", "Команда Ани Б.", "Команда Ани Б."]
+                ],
+                3: [
+                    ["Команда Маши", "Команда Маши", "Игорь", "Элина"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Маша"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Лена"],
+                    ["Аня Б.", "Команда Даши", "Команда Даши", "Даша"]
+                ],
+                4: [
+                    ["Стажер", "Стажер", "Игорь", "Элина"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Маша"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Лена"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Команда Лены"]
+                ],
+                5: [
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Даша"],
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Оля М.", "Артемий", "Команда Даши"],
+                    ["Стажер", "Команда Ани Г.", "Команда Андрея", "Андрей"]
+                ]
+            },
+            4: {
+                1: [
+                    ["Команда Даши", "Команда Даши", "Игорь", "Элина"],
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Даша"],
+                    ["Стажер", "Команда Даши", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Команда Маши", "Команда Маши", "Лида"]
+                ],
+                2: [
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Аня Б."],
+                    ["Команда Ани Б.", "Команда Ани Б.", "Команда Ани Б.", "Команда Лены"],
+                    ["Стажер", "Стажер", "Команда Ани Б.", "Команда Ани Б."]
+                ],
+                3: [
+                    ["Команда Маши", "Команда Маши", "Игорь", "Элина"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Маша"],
+                    ["Команда Маши", "Команда Маши", "Команда Маши", "Лена"],
+                    ["Аня Б.", "Команда Даши", "Команда Даши", "Даша"]
+                ],
+                4: [
+                    ["Стажер", "Стажер", "Игорь", "Элина"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Маша"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Лена"],
+                    ["Команда Лены", "Команда Лены", "Команда Лены", "Команда Лены"]
+                ],
+                5: [
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Даша"],
+                    ["Команда Даши", "Команда Даши", "Команда Даши", "Команда Даши"],
+                    ["Стажер", "Оля М.", "Артемий", "Команда Даши"],
+                    ["Стажер", "Команда Ани Б.", "Команда Дани", "Даня"]
+                ]
+            }
+        };
+
+        // === 3. Логика тем ===
+        const themeBtn = document.getElementById('theme-btn');
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeBtn.textContent = '☀️';
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                themeBtn.textContent = '🌙';
+            }
+        }
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+        setTheme(prefersDark.matches ? 'dark' : 'light');
+        prefersDark.addEventListener('change', (e) => setTheme(e.matches ? 'dark' : 'light'));
+        themeBtn.addEventListener('click', () => {
+            const isDark = document.documentElement.hasAttribute('data-theme');
+            setTheme(isDark ? 'light' : 'dark');
+        });
+
+        // === 4. Работа с датами ===
+        const datePicker = document.getElementById('date-picker');
+        const entitySelect = document.getElementById('entity-select');
+        const cycleInfo = document.getElementById('cycle-info');
+        const mapGrid = document.getElementById('map-grid');
+        const prevBtn = document.getElementById('prev-day');
+        const nextBtn = document.getElementById('next-day');
+        const todayBtn = document.getElementById('today-btn');
+
+        // Установка текущей даты
+        function setToday() {
+            const now = new Date();
+            const currentLocalDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            datePicker.value = currentLocalDate;
+            renderMap();
+        }
+
+        // Инициализация при загрузке
+        setToday();
+
+        // Переключение дат стрелочками
+        function shiftDate(daysOffset) {
+            const currentVal = datePicker.value;
+            if (!currentVal) return;
+            
+            const [year, month, day] = currentVal.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day);
+            dateObj.setDate(dateObj.getDate() + daysOffset);
+            
+            const newYear = dateObj.getFullYear();
+            const newMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const newDay = String(dateObj.getDate()).padStart(2, '0');
+            
+            datePicker.value = `${newYear}-${newMonth}-${newDay}`;
+            renderMap();
+        }
+
+        prevBtn.addEventListener('click', () => shiftDate(-1));
+        nextBtn.addEventListener('click', () => shiftDate(1));
+        todayBtn.addEventListener('click', setToday); // Обработчик для кнопки "Сегодня"
+
+        function getDiffDays(targetDate) {
+            const start = Date.UTC(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate());
+            const target = Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+            return Math.floor((target - start) / (1000 * 60 * 60 * 24));
+        }
+
+        function calculateCycle(selectedDate) {
+            const diffDays = getDiffDays(selectedDate);
+            let cycleDay = diffDays % 28;
+            if (cycleDay < 0) cycleDay += 28; 
+
+            const week = Math.floor(cycleDay / 7) + 1;
+            const dayOfWeek = cycleDay % 7; 
+            const scheduleDayIndex = dayOfWeek + 1;
+
+            return { week, scheduleDayIndex, dayOfWeek };
+        }
+
+        function getDayName(dayIndex) {
+            const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+            return days[dayIndex];
+        }
+
+        function getLayoutForDay(week, scheduleDayIndex) {
+            if (scheduleDayIndex > 5) return emptyDay;
+            return scheduleData[week][scheduleDayIndex];
+        }
+
+        // === 5. Рендеринг ===
+        function renderMap() {
+            const selectedDate = new Date(datePicker.value);
+            if (isNaN(selectedDate)) return;
+
+            const selectedEntity = entitySelect.value;
+            const { week, scheduleDayIndex, dayOfWeek } = calculateCycle(selectedDate);
+            
+            cycleInfo.textContent = `Неделя цикла: ${week} из 4 | День: ${getDayName(dayOfWeek)}`;
+
+            const layout = getLayoutForDay(week, scheduleDayIndex);
+            const rowsLabels = [43, 44, 45, 46];
+
+            mapGrid.innerHTML = '';
+
+            layout.forEach((row, rowIndex) => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+
+                const label = document.createElement('div');
+                label.className = 'row-label';
+                label.textContent = rowsLabels[rowIndex];
+                rowDiv.appendChild(label);
+
+                const seatsContainer = document.createElement('div');
+                seatsContainer.className = 'seats-container';
+
+                row.forEach(seatName => {
+                    const seatDiv = document.createElement('div');
+                    seatDiv.className = 'seat';
+                    seatDiv.textContent = seatName !== "Пусто" ? seatName : "";
+
+                    if (selectedEntity && seatName !== "Пусто") {
+                        const entityOfSeat = teamMapping[seatName] || "TBD";
+                        if (entityOfSeat === selectedEntity || seatName === selectedEntity) {
+                            seatDiv.classList.add('highlight');
+                        }
+                    }
+
+                    seatsContainer.appendChild(seatDiv);
+                });
+
+                rowDiv.appendChild(seatsContainer);
+                mapGrid.appendChild(rowDiv);
+            });
+        }
+
+        // === 6. События ===
+        datePicker.addEventListener('change', renderMap);
+        entitySelect.addEventListener('change', renderMap);
+
+    </script>
+</body>
+</html>
