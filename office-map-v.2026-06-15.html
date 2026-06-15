@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта рассадки в офисе</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f7;
+            --surface-color: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --border-color: #d2d2d7;
+            --seat-fade-bg: #e5e5ea;
+            --seat-fade-text: #8e8e93;
+            --seat-highlight-bg: #ffcc00;
+            --seat-highlight-text: #000000;
+            --control-bg: #ffffff;
+            --shadow: 0 4px 6px rgba(0,0,0,0.05);
+            --badge-bg: #e5e5ea;
+            --accent-color: #007aff;
+            --divider-color: #d2d2d7;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #000000;
+            --surface-color: #1c1c1e;
+            --text-primary: #f5f5f7;
+            --text-secondary: #a1a1a6;
+            --border-color: #38383a;
+            --seat-fade-bg: #2c2c2e;
+            --seat-fade-text: #636366;
+            --seat-highlight-bg: #ffd60a;
+            --seat-highlight-text: #000000;
+            --control-bg: #2c2c2e;
+            --shadow: 0 4px 6px rgba(0,0,0,0.3);
+            --badge-bg: #3a3a3c;
+            --accent-color: #0a84ff;
+            --divider-color: #38383a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            background-color: var(--surface-color);
+            padding: 16px 20px;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .cycle-info {
+            display: inline-block;
+            background-color: var(--badge-bg);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 32px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        /* FR-2: чипы быстрого выбора команды */
+        .chips {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+
+        .chip {
+            flex: 0 0 auto;
+            min-height: 40px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background-color: var(--control-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .chip.active {
+            background-color: var(--accent-color);
+            color: #ffffff;
+            border-color: var(--accent-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        select, input[type="date"] {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--control-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            height: 40px;
+        }
+
+        select { flex: 1; min-width: 200px; }
+        input[type="date"] { flex: 1; }
+
+        .date-picker-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-width: 240px;
+        }
+
+        .today-btn {
+            align-self: flex-end;
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
+        .date-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .icon-btn {
+            background-color: var(--control-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* FR-5 / FR-6: строка статуса выбора */
+        .status {
+            font-size: 14px;
+            font-weight: 600;
+            min-height: 20px;
+            color: var(--text-secondary);
+        }
+        .status.ok { color: var(--accent-color); }
+        .status.muted { color: var(--text-secondary); }
+
+        .map-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+        .office-layout {
+            position: relative;
+            background-color: var(--surface-color);
+            padding: 24px 60px 24px 30px;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .landmark {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .landmark.top { margin-bottom: 20px; }
+        .landmark.right {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            writing-mode: vertical-rl;
+        }
+
+        .grid-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .row-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: var(--divider-color);
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        /* промежуток без линии (между рядами 44 и 45) */
+        .divider.invisible {
+            background-color: transparent;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .row-label {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            width: 25px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .seats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .seat {
+            width: 100%;
+            min-width: 0;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 6px;
+            word-break: break-word;
+            transition: all 0.2s ease;
+            background-color: var(--seat-fade-bg);
+            color: var(--seat-fade-text);
+            border: 1px solid transparent;
+        }
+
+        /* FR-8: выделение не только цветом — добавлена рамка */
+        .seat.highlight {
+            background-color: var(--seat-highlight-bg) !important;
+            color: var(--seat-highlight-text) !important;
+            font-weight: 600;
+            border: 2px solid var(--seat-highlight-text);
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            z-index: 2;
+        }
+
+        .empty-message {
+            padding: 40px 16px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        /* FR-8: легенда */
+        .legend {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0 20px 24px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .legend .swatch {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background-color: var(--seat-highlight-bg);
+            border: 2px solid var(--seat-highlight-text);
+            flex-shrink: 0;
+        }
+
+        /* FR-1: адаптив под телефон — план умещается по ширине */
+        @media (max-width: 600px) {
+            .header-top { flex-direction: column; gap: 10px; }
+            .theme-toggle { position: absolute; top: 12px; right: 16px; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .map-container { padding: 14px; }
+            .office-layout { padding: 16px 34px 16px 14px; }
+            .landmark.right { right: 12px; }
+            .row { gap: 8px; }
+            .row-label { width: 18px; font-size: 12px; }
+            .seats-container { gap: 8px; }
+            .seat { height: 56px; font-size: 10px; padding: 4px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-top">
+            <div class="title-group">
+                <h1>Карта рассадки</h1>
+                <div class="cycle-info" id="cycle-info">Загрузка...</div>
+            </div>
+            <button class="theme-toggle" id="theme-btn" aria-label="Переключить тему">🌓</button>
+        </div>
+
+        <!-- FR-2: быстрый выбор команды одним тапом -->
+        <div class="chips" id="chips" role="group" aria-label="Быстрый выбор команды"></div>
+
+        <div class="controls">
+            <div class="date-picker-wrapper">
+                <button class="today-btn" id="today-btn">Сегодня</button>
+                <div class="date-controls">
+                    <button class="icon-btn" id="prev-day" aria-label="Предыдущий день">◀</button>
+                    <input type="date" id="date-picker" aria-label="Дата">
+                    <button class="icon-btn" id="next-day" aria-label="Следующий день">▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FR-5 / FR-6: статус выбора -->
+        <div class="status" id="status"></div>
+    </div>
+
+    <div class="map-container">
+        <div class="office-layout">
+            <div class="landmark top">Шкафы</div>
+            <div class="grid-wrapper" id="map-grid"></div>
+            <div class="landmark right">Окно</div>
+        </div>
+    </div>
+
+    <!-- FR-8: легенда -->
+    <div class="legend"><span class="swatch"></span> Жёлтым выделены места выбранной команды</div>
+
+    <script>
+        const teamMapping = {
+            "Аня Б.": "Online", "Команда Ани Б.": "Online", "Андрей": "Online",
+            "Команда Андрея": "Online", "Диана": "Online", "Команда Дианы": "Online",
+            "Дима": "Online", "Команда Димы": "Online",
+            "Даня": "Offline", "Команда Дани": "Offline", "Илона": "Offline",
+            "Ира": "Offline", "Команда Иры": "Offline", "Лена": "Offline", "Команда Лены": "Offline",
+            "Енике": "Offline", "Аня Г.": "Offline", "Команда Ани Г.": "Offline",
+            "Артемий": "IP", "Маша": "IP", "Команда Маши": "IP", "Оля М.": "IP",
+            "Даша": "IT", "Команда Даши": "IT",
+            "Стажер": "Стажеры", "Игорь": "Игорь", "Элина": "Элина"
+        };
+
+        const START_DATE = new Date(2026, 4, 4);
+
+        const scheduleData = {
+            1: {
+                1: [["Команда Дианы","Команда Дианы","Игорь","Элина"],["Команда Дианы","Команда Дианы","Команда Дианы","Диана"],["Команда Ани Г.","Команда Ани Г.","Команда Ани Г.","Аня Г."],["Команда Ани Г.","Стажер","Андрей","Дима"]],
+                2: [["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Аня Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Лены"],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."]],
+                3: [["Команда Маши","Команда Маши","Игорь","Элина"],["Команда Маши","Команда Маши","Команда Маши","Маша"],["Команда Маши","Команда Маши","Команда Маши","Лена"],["Аня Б.","Команда Маши","Команда Даши","Даша"]],
+                4: [["Команда Лены","Стажер","Игорь","Элина"],["Команда Лены","Команда Лены","Команда Лены","Маша"],["Команда Лены","Команда Лены","Команда Лены","Лена"],["Команда Лены","Команда Лены","Команда Лены","Команда Лены"]],
+                5: [["Оля М.","Артемий","Стажер","Элина"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Даша"]]
+            },
+            2: {
+                1: [["Даня","Аня Г.","Игорь","Элина"],["Команда Димы","Команда Димы","Команда Димы","Дима"],["Команда Иры","Команда Иры","Команда Иры","Ира"],["Стажер","Стажер","Диана","Команда Ани Б."]],
+                2: [["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Аня Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Даши"],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."]],
+                3: [["Команда Маши","Команда Маши","Игорь","Элина"],["Команда Маши","Команда Маши","Команда Маши","Маша"],["Команда Маши","Команда Маши","Команда Маши","Лена"],["Аня Б.","Команда Маши","Команда Даши","Даша"]],
+                4: [["Команда Лены","Стажер","Игорь","Элина"],["Команда Лены","Команда Лены","Команда Лены","Маша"],["Команда Лены","Команда Лены","Команда Лены","Лена"],["Команда Лены","Команда Лены","Команда Лены","Команда Лены"]],
+                5: [["Оля М.","Артемий","Стажер","Элина"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Даша"]]
+            },
+            3: {
+                1: [["Команда Маши","Команда Маши","Игорь","Элина"],["Команда Маши","Команда Маши","Команда Маши","Маша"],["Команда Маши","Команда Маши","Команда Маши","Команда Маши"],["Стажер","Команда Даши","Команда Даши","Команда Даши"]],
+                2: [["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Аня Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Лены"],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."]],
+                3: [["Команда Маши","Команда Маши","Игорь","Элина"],["Команда Маши","Команда Маши","Команда Маши","Маша"],["Команда Маши","Команда Маши","Команда Маши","Лена"],["Аня Б.","Команда Маши","Команда Даши","Даша"]],
+                4: [["Команда Лены","Стажер","Игорь","Элина"],["Команда Лены","Команда Лены","Команда Лены","Маша"],["Команда Лены","Команда Лены","Команда Лены","Лена"],["Команда Лены","Команда Лены","Команда Лены","Команда Лены"]],
+                5: [["Команда Андрея","Команда Андрея","Андрей","Элина"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Даша"]]
+            },
+            4: {
+                1: [["Стажер","Стажер","Игорь","Элина"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Даша"]],
+                2: [["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Аня Б."],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Лены"],["Команда Ани Б.","Команда Ани Б.","Команда Ани Б.","Команда Ани Б."]],
+                3: [["Команда Маши","Команда Маши","Игорь","Элина"],["Команда Маши","Команда Маши","Команда Маши","Маша"],["Команда Маши","Команда Маши","Команда Маши","Лена"],["Аня Б.","Команда Маши","Команда Даши","Даша"]],
+                4: [["Команда Лены","Стажер","Игорь","Элина"],["Команда Лены","Команда Лены","Команда Лены","Маша"],["Команда Лены","Команда Лены","Команда Лены","Лена"],["Команда Лены","Команда Лены","Команда Лены","Команда Лены"]],
+                5: [["Оля М.","Артемий","Команда Лены","Элина"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Команда Даши"],["Команда Даши","Команда Даши","Команда Даши","Даша"]]
+            }
+        };
+
+        const themeBtn = document.getElementById('theme-btn');
+        const datePicker = document.getElementById('date-picker');
+        const cycleInfo = document.getElementById('cycle-info');
+        const mapGrid = document.getElementById('map-grid');
+        const chipsBox = document.getElementById('chips');
+        const statusEl = document.getElementById('status');
+
+        // Источник вариантов выбора (только кнопки, без выпадающего списка)
+        const ENTITIES = [
+            { value: 'Online',  label: 'Online',  aria: 'Управление Online' },
+            { value: 'Offline', label: 'Offline', aria: 'Управление Offline' },
+            { value: 'IP',      label: 'IP',      aria: 'Управление IP' },
+            { value: 'IT',      label: 'IT',      aria: 'Управление IT' },
+            { value: 'Стажеры', label: 'Стажеры' },
+            { value: 'Игорь',   label: 'Игорь' },
+            { value: 'Элина',   label: 'Элина' }
+        ];
+        let currentSelection = '';
+
+        // ---- FR-4: тема с запоминанием ----
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeBtn.textContent = '☀️';
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                themeBtn.textContent = '🌙';
+            }
+        }
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+        const savedTheme = localStorage.getItem('theme');
+        setTheme(savedTheme ? savedTheme : (prefersDark.matches ? 'dark' : 'light'));
+        themeBtn.addEventListener('click', () => {
+            const next = document.documentElement.hasAttribute('data-theme') ? 'light' : 'dark';
+            setTheme(next);
+            localStorage.setItem('theme', next);
+        });
+
+        // ---- Дата (логика часового пояса не изменялась) ----
+        function setToday() {
+            const now = new Date();
+            datePicker.value = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            renderMap();
+        }
+
+        function shiftDate(offset) {
+            const d = new Date(datePicker.value);
+            d.setDate(d.getDate() + offset);
+            datePicker.value = d.toISOString().split('T')[0];
+            renderMap();
+        }
+
+        document.getElementById('prev-day').onclick = () => shiftDate(-1);
+        document.getElementById('next-day').onclick = () => shiftDate(1);
+        document.getElementById('today-btn').onclick = setToday;
+
+        // ---- FR-2: кнопки быстрого выбора команды/сотрудника ----
+        function buildChips() {
+            ENTITIES.forEach(e => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'chip';
+                chip.dataset.value = e.value;
+                chip.textContent = e.label;
+                chip.setAttribute('aria-label', 'Выбрать: ' + (e.aria || e.label));
+                chip.addEventListener('click', () => selectEntity(e.value));
+                chipsBox.appendChild(chip);
+            });
+        }
+
+        function setActiveChip(value) {
+            chipsBox.querySelectorAll('.chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.value === value);
+            });
+        }
+
+        // ---- FR-3: единая точка выбора + запоминание ----
+        function selectEntity(value) {
+            currentSelection = value;
+            localStorage.setItem('selection', value);
+            setActiveChip(value);
+            renderMap();
+        }
+
+        datePicker.onchange = renderMap;
+
+        function setStatus(text, mode) {
+            statusEl.textContent = text || '';
+            statusEl.className = 'status' + (mode ? ' ' + mode : '');
+        }
+
+        function renderMap() {
+            const date = new Date(datePicker.value);
+            const diff = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate())) / 86400000);
+            let dayIdx = diff % 28; if (dayIdx < 0) dayIdx += 28;
+            const week = Math.floor(dayIdx / 7) + 1;
+            const dw = dayIdx % 7;
+
+            cycleInfo.textContent = `Неделя цикла: ${week} из 4 | День: ${['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'][dw]}`;
+
+            mapGrid.innerHTML = '';
+            const sel = currentSelection;
+
+            // FR-6: выходной — рассадки нет
+            if (dw >= 5) {
+                const msg = document.createElement('div');
+                msg.className = 'empty-message';
+                msg.textContent = 'Выходной — рассадки нет';
+                mapGrid.appendChild(msg);
+                setStatus('Выходной — рассадки нет', 'muted');
+                return;
+            }
+
+            const layout = scheduleData[week][dw + 1];
+            let highlightCount = 0;
+            let firstHighlight = null;
+
+            layout.forEach((row, i) => {
+                const container = document.createElement('div');
+                container.className = 'row-container';
+                if (i > 0) { const d = document.createElement('div'); d.className = (i === 2) ? 'divider invisible' : 'divider'; container.appendChild(d); }
+
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                const label = document.createElement('div'); label.className = 'row-label'; label.textContent = 43 + i;
+                const seats = document.createElement('div'); seats.className = 'seats-container';
+
+                row.forEach(name => {
+                    const s = document.createElement('div'); s.className = 'seat';
+                    s.textContent = name === "Пусто" ? "" : name;
+                    if (name !== "Пусто") s.title = name; // FR-7: полное название
+                    if (sel && name !== "Пусто" && (teamMapping[name] === sel || name === sel)) {
+                        s.classList.add('highlight');
+                        highlightCount++;
+                        if (!firstHighlight) firstHighlight = s;
+                    }
+                    seats.appendChild(s);
+                });
+
+                rowDiv.append(label, seats);
+                container.appendChild(rowDiv);
+                mapGrid.appendChild(container);
+            });
+
+            // FR-5 / FR-6: статус и переход к местам
+            if (!sel) {
+                setStatus('Выберите команду, чтобы увидеть свои места', 'muted');
+            } else if (highlightCount === 0) {
+                setStatus('Сегодня у выбранной команды нет мест', 'muted');
+            } else {
+                setStatus('Ваши места: ' + highlightCount, 'ok');
+                if (firstHighlight) firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // ---- Инициализация ----
+        buildChips();
+        const savedSel = localStorage.getItem('selection');
+        if (savedSel && ENTITIES.some(e => e.value === savedSel)) {
+            currentSelection = savedSel;
+            setActiveChip(savedSel);
+        }
+        setToday();
+    </script>
+</body>
+</html>
